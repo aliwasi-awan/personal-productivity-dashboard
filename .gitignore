@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.venv/
+.env
+.env.*
+!.env.example
+*.local
+*.tsbuildinfo
+coverage/
+backups/
+playwright-report/
+test-results/
