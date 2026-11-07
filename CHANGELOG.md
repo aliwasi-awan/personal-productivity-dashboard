@@ -7,3 +7,5 @@
 - Validated JSON backup/restore and atomic IndexedDB persistence.
 - Read-only Google Calendar authorization, calendar mapping, and combined schedule.
 - Manual GitHub Pages release workflow and automated checks.
+
+- First-connect calendar selection and domain mapping, connection prompt, and automatic refresh while connected.

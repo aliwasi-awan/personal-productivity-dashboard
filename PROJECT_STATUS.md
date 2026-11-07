@@ -17,7 +17,7 @@
 - Windows launcher, isolated environments, GitHub check workflow and manual Pages deployment workflow.
 
 ## Verification
-- 16 automated tests passed: storage roundtrip, malformed/future imports, reference integrity, concurrent writes, credential stripping, populated backup restoration, calendar boundaries, deduplication and safe links.
+- 21 automated tests passed (including first-connect mappings, freshness boundaries, and enabled-calendar selection): storage roundtrip, malformed/future imports, reference integrity, concurrent writes, credential stripping, populated backup restoration, calendar boundaries, deduplication and safe links.
 - TypeScript check and Vite production build passed through the repaired Windows launcher.
 - Browser verified task creation, Overview-to-domain completion, table/board/calendar agreement, persistence after reload, study-session logging and Overview statistics.
 - 390px mobile navigation and document width checked. Dashboard appearance captured through native browser window; extended screenshot capture was limited by minimized browser/window-control behavior.
@@ -25,6 +25,6 @@
 - Independent reviewer identified form-event timing and import validation issues; fixes incorporated before final checks.
 
 ## External setup
-- Owner must create a Google Cloud project, enable Calendar API, and configure a web OAuth client. Instructions in README and Settings.
+- Google Cloud project created and Calendar API confirmed enabled. Web OAuth branding, consent, client configuration, and live connection remain pending; browser control failures blocked further setup. Instructions in README and Settings.
 - Live OAuth and production Pages validation require that setup and deployment approval respectively.
 - GitHub Pages is not deployed. No production URL should be reported as live yet.

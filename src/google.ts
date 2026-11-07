@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarAssignment, CalendarEvent } from './types';
 
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const RESUME_MAX_AGE_MS = 60 * 1000;
 interface TokenResponse { access_token?: string; expires_in?: number; error?: string; scope?: string; }
 interface TokenClient { requestAccessToken: (options?: {prompt?: string}) => void; }
 interface OAuth { initTokenClient: (options: {client_id:string;scope:string;callback:(response:TokenResponse)=>void;error_callback:(error:{type:string})=>void;include_granted_scopes:boolean}) => TokenClient; revoke: (token:string,callback:()=>void)=>void; hasGrantedAllScopes: (response:TokenResponse,...scopes:string[])=>boolean; }
@@ -29,6 +31,16 @@ interface Page<T> { items?:T[];nextPageToken?:string; }
 class CalendarAPIError extends Error { status:number; constructor(status:number) {super(status===401?'Your Google connection expired. Connect again to refresh.':status===403?'Google Calendar access was denied. Check API setup and calendar permissions.':status===429?'Google Calendar is temporarily rate limited. Try refreshing later.':'Google Calendar could not refresh. Please try again.');this.status=status;} }
 export function deduplicateEvents(events:CalendarEvent[]) { return [...new Map(events.map(event=>[JSON.stringify([event.calendarId,event.id]),event])).values()].sort((a,b)=>a.start.localeCompare(b.start)); }
 
+export function isCalendarDataFresh(refreshed: string | null, maxAge = SYNC_INTERVAL_MS, now = Date.now()) {
+  if (!refreshed) return false;
+  const age = now - Date.parse(refreshed);
+  return age >= 0 && age < maxAge;
+}
+
+export function enabledCalendarIds(assignments: CalendarAssignment[]) {
+  return new Set(assignments.filter(assignment => assignment.enabled).map(assignment => assignment.id));
+}
+
 /** Read-only browser integration. OAuth tokens are held only in this hook's memory. */
 export function useGoogleCalendar(clientId:string, assignments:CalendarAssignment[], range?:{start:string;end:string}) {
   const [events,setEvents]=useState<CalendarEvent[]>([]);
@@ -45,7 +57,8 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
   const assignmentRef=useRef(assignments); assignmentRef.current=assignments;
   const rangeRef=useRef(range);rangeRef.current=range;
   const eventCache=useRef(new Map<string,{events:CalendarEvent[];refreshed:string}>());
-  const cachedCalendars=useRef<{id:string;name:string}[]|null>(null);
+  const cachedCalendars=useRef<{items:{id:string;name:string}[];refreshed:string}|null>(null);
+  const lastLoaded=useRef<string|null>(null);
   const abort=useRef<AbortController|null>(null);
   const generation=useRef(0);
   const alive=useRef(true);
@@ -56,6 +69,7 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
     authSequence.current++;
     generation.current++;abort.current?.abort();abort.current=null;
     window.clearTimeout(expiryTimer.current);token.current=null;cachedCalendars.current=null;eventCache.current.clear();
+    lastLoaded.current=null;
     if(alive.current){setConnected(false);setLoading(false);setEvents([]);setCalendars([]);setLastRefresh(null);}
   },[]);
   const load=useCallback(async(force=true)=>{
@@ -77,19 +91,28 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
     };
     try {
       if(force)eventCache.current.clear();
-      let available=force?null:cachedCalendars.current;
-      if(!available){const list=await getAll<ListedCalendar>('users/me/calendarList',{maxResults:'250',minAccessRole:'reader',fields:'items(id,summary,summaryOverride),nextPageToken'});available=[...new Map(list.map(c=>[c.id,{id:c.id,name:c.summaryOverride||c.summary||c.id}])).values()];}
+      const calendarCache=cachedCalendars.current;
+      let available=calendarCache&&!force&&isCalendarDataFresh(calendarCache.refreshed)?calendarCache.items:null;
+      if(!available){
+        const list=await getAll<ListedCalendar>('users/me/calendarList',{maxResults:'250',minAccessRole:'reader',fields:'items(id,summary,summaryOverride),nextPageToken'});
+        if(run!==generation.current||!alive.current)return;
+        available=[...new Map(list.map(c=>[c.id,{id:c.id,name:c.summaryOverride||c.summary||c.id}])).values()];
+        cachedCalendars.current={items:available,refreshed:new Date().toISOString()};
+      }
       if(run!==generation.current||!alive.current)return;
-      cachedCalendars.current=available;setCalendars(available);
-      const prefs=assignmentRef.current;
-      const selected=prefs.length?available.filter(c=>prefs.some(a=>a.id===c.id&&a.enabled)):available;
+      setCalendars(available);
+      const enabledIds=enabledCalendarIds(assignmentRef.current);
+      const selected=available.filter(calendar=>enabledIds.has(calendar.id));
       const now=new Date();
       let start=rangeRef.current?new Date(rangeRef.current.start):new Date(now.getFullYear(),now.getMonth()-3,1);
       let end=rangeRef.current?new Date(rangeRef.current.end):new Date(now.getFullYear(),now.getMonth()+4,1);
       if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start){start=new Date(now.getFullYear(),now.getMonth()-3,1);end=new Date(now.getFullYear(),now.getMonth()+4,1);}
       const cacheKey=JSON.stringify([selected.map(c=>c.id).sort(),start.toISOString(),end.toISOString()]);
       const cached=eventCache.current.get(cacheKey);
-      if(cached){setEvents(cached.events);setLastRefresh(cached.refreshed);return;}
+      if(cached&&isCalendarDataFresh(cached.refreshed)){
+        lastLoaded.current=cached.refreshed;
+        setEvents(cached.events);setLastRefresh(cached.refreshed);return;
+      }
       const combined:CalendarEvent[]=[];
       // Fetch only enabled calendars; sequential requests avoid a burst against the API.
       for(const calendar of selected){
@@ -102,11 +125,14 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
       if(eventCache.current.size>=12)eventCache.current.delete(eventCache.current.keys().next().value!);
       eventCache.current.set(cacheKey,{events:nextEvents,refreshed});
       setEvents(nextEvents);setLastRefresh(refreshed);
+      lastLoaded.current=refreshed;
     }catch(cause){
       if(controller.signal.aborted||run!==generation.current||!alive.current)return;
       if(cause instanceof CalendarAPIError&&cause.status===401)clearConnection();
       setError(cause instanceof CalendarAPIError?cause.message:'Could not reach Google Calendar. Check your connection and try again.');
-    }finally{if(run===generation.current&&alive.current)setLoading(false);}
+    }finally{
+      if(run===generation.current&&alive.current){abort.current=null;setLoading(false);}
+    }
   },[clearConnection]);
   const refresh=useCallback(()=>load(true),[load]);
   requestRef.current=()=>{void refresh();};
@@ -133,9 +159,36 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
     }
     return()=>{disposed=true;alive.current=false;generation.current++;abort.current?.abort();window.clearTimeout(expiryTimer.current);token.current=null;client.current=null;};
   },[clientId,clearConnection,loadAttempt]);
-  const selectionKey=JSON.stringify(assignments.map(a=>[a.id,a.enabled]));
-  const rangeKey=range?`${range.start}/${range.end}`:'';
-  useEffect(()=>{if(token.current)void load(false);},[selectionKey,rangeKey,load]);
+  const enabledIds = useMemo(() => enabledCalendarIds(assignments), [assignments]);
+  const visibleEvents = useMemo(() => events.filter(event => enabledIds.has(event.calendarId)), [events, enabledIds]);
+  const selectionKey = JSON.stringify([...enabledIds].sort());
+  const rangeKey = range ? `${range.start}/${range.end}` : '';
+  useEffect(() => {
+    if (!token.current) return;
+    // A successful load for the previous selection does not make this one fresh.
+    lastLoaded.current = null;
+    void load(false);
+  }, [selectionKey, rangeKey, load]);
+  useEffect(() => {
+    if (!connected) return;
+    const refreshWhileActive = (maxAge?: number) => {
+      if (!token.current || abort.current || authPending.current) return;
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      if (maxAge !== undefined && isCalendarDataFresh(lastLoaded.current, maxAge)) return;
+      void refresh();
+    };
+    const resume = () => refreshWhileActive(RESUME_MAX_AGE_MS);
+    const timer = window.setInterval(() => refreshWhileActive(), SYNC_INTERVAL_MS);
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', resume);
+      window.removeEventListener('online', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [connected, refresh]);
   const connect=useCallback(()=>{
     if(!clientId.trim()){setError('Add your Google OAuth web client ID in Settings first.');return;}
     if(!navigator.onLine){setError('Connect to the internet before signing in with Google.');return;}
@@ -150,5 +203,5 @@ export function useGoogleCalendar(clientId:string, assignments:CalendarAssignmen
     // Revoke only when the user explicitly disconnects, never on unmount.
     if(value)try{oauth()?.revoke(value,()=>{});}catch{/* Local disconnect is already complete. */}
   },[clearConnection]);
-  return {events,calendars,connected,loading,error,lastRefresh,connect,disconnect,refresh};
+  return {events:visibleEvents,calendars,connected,loading,error,lastRefresh,connect,disconnect,refresh};
 }

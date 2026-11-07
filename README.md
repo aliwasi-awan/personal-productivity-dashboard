@@ -41,7 +41,7 @@ The app works without Google. To add events:
 4. Create an OAuth client with application type **Web application**.
 5. Add exact **Authorized JavaScript origins**, including your development origin, such as `http://localhost:5173` (and `http://127.0.0.1:5173` if used), plus `https://aliwasi-awan.github.io` for the eventual deployed app. Origins do not include a repository path. Ports must match the actual preview server.
 6. Copy the **client ID** to Daymark Settings and connect. Do not copy or publish a client secret. A browser OAuth client ID is a public identifier.
-7. Assign accessible calendars to one or more domains and enable the ones to display. Refresh after changes in Google Calendar. Reconnect when the short-lived authorization expires.
+7. First connection enables accessible calendars and maps familiar names to domains; unmatched calendars appear on Overview. Adjust assignments in Settings. While connected, visible, and online, events refresh every five minutes and on return after a minute. Use Refresh for immediate updates. Reconnect when short-lived authorization expires.
 
 OAuth access tokens and fetched events stay in memory, never in the repository or JSON backups. Refreshing the browser requires connecting again. Offline local task editing still works while the app is open; Google fetching requires a connection. This release is not an installable offline PWA.
 
