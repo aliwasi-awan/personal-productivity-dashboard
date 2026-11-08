@@ -42,7 +42,6 @@ a.calendar-event:focus-visible .calendar-event-title { text-decoration: underlin
 
 .category-heading { gap: 14px; } .category-disclosure { flex: 1; min-width: 0; } .category-disclosure>summary { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; cursor: pointer; list-style: none; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); } .category-disclosure>summary::-webkit-details-marker { display: none; } .category-disclosure>summary:hover { border-color: var(--subtle); } .category-title { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; } .category-count { color: var(--muted); font-size: 12px; } .category-chevron { color: var(--subtle); margin-left: auto; transition: transform .18s; } .category-disclosure[open] .category-chevron { transform: rotate(180deg); } .category-disclosure>.project-grid { padding: 13px 0 0; } .category-actions { display: flex; gap: 12px; flex-shrink: 0; }
 
-.anki-panel { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 22px 0; flex-wrap: wrap; } .anki-panel h3 { font-size: 13px; margin-bottom: 5px; } .anki-panel .notice { flex-basis: 100%; margin: 0; }
 
 .domain-card h3>span, .domain-card p, .category-count, .project-card p, .project-card-bottom { font-size: 13px; }
 .category-label { flex-wrap: wrap; }

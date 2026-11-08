@@ -34,7 +34,7 @@ export function validateData(input:unknown):AppData {
   };
   for(const list of [data.projects,data.tasks,data.goals,data.trackers,data.activities,data.preferences.calendars])if(new Set(list.map(v=>v.id)).size!==list.length)fail('duplicate IDs');
   const projects=new Map(data.projects.map(v=>[v.id,v]));
-  for(const item of [...data.tasks,...data.trackers]){if(!item.projectId || !projects.has(item.projectId)||projects.get(item.projectId)?.domain!==item.domain)fail('task or tracker references a missing project or different domain');}
+  for(const item of [...data.tasks.filter(task=>task.projectId!==''),...data.trackers]){if(projects.get(item.projectId)?.domain!==item.domain)fail('task or tracker references a missing project or different domain');}
   for(const g of data.goals)if(!projects.has(g.projectId))fail('goal references a missing project');
   const trackers=new Set(data.trackers.map(v=>v.id));for(const a of data.activities)if(!trackers.has(a.trackerId))fail('activity references a missing tracker');
   for(const t of data.tasks)if((t.status==='done')!==(t.completedAt!==null))fail('task completion and timestamp disagree');

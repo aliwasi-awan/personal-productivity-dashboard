@@ -14,7 +14,7 @@ describe('backup safety',()=>{
   });
   it('merging the same backup twice does not duplicate records or overwrite local edits',()=>{const a=initialData(),b=initialData();b.projects[0].name='Old name';b.projects.push({...b.projects[0],id:'new',name:'New'});const merged=mergeData(a,b);expect(mergeData(merged,b)).toEqual(merged);expect(merged.projects[0].name).toBe('Habits');});
   it('refuses cross-domain project references and inconsistent task completion',()=>{const data=initialData();data.tasks.push({id:'t',domain:'work',projectId:'personal-0',title:'Task',notes:'',status:'todo',priority:'medium',due:'',createdAt:new Date().toISOString(),completedAt:null});expect(()=>validateData(data)).toThrow('different domain');data.tasks[0].domain='personal';data.tasks[0].status='done';expect(()=>validateData(data)).toThrow('timestamp');});
-  it('rejects unassigned records that would be invisible in project views',()=>{const data=initialData();data.tasks.push({id:'t',domain:'personal',projectId:'',title:'Task',notes:'',status:'todo',priority:'medium',due:'',createdAt:new Date().toISOString(),completedAt:null});expect(()=>validateData(data)).toThrow('missing project');});
+  it('round-trips domain-only tasks and rejects dangling project links',()=>{const data=initialData();data.tasks.push({id:'t',domain:'personal',projectId:'',title:'Task',notes:'',status:'todo',priority:'medium',due:'',createdAt:new Date().toISOString(),completedAt:null});expect(parseBackup(backupJSON(data))).toEqual(data);data.tasks[0].projectId='missing';expect(()=>validateData(data)).toThrow('missing project');});
 });
 describe('atomic persistence',()=>{
   it('persists reloads, rejects stale tabs, and leaves existing data intact after failed validation',async()=>{
