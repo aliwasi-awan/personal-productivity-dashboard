@@ -20,6 +20,10 @@ pnpm dev
 
 Open the address printed by Vite. `pnpm test` runs automated tests; `pnpm build` checks TypeScript and produces `dist`; `pnpm preview` serves the production build locally. On machines without pnpm, install pnpm from its official instructions or use Corepack if your Node distribution includes it.
 
+## Local Anki due count
+
+The German Anki project can refresh the due-card total from Anki Desktop through AnkiConnect on `127.0.0.1:8765`. Run this app locally with Anki Desktop open and AnkiConnect enabled. Configure two distinct deck names in ignored `.env.local` as `ANKI_REVIEW_DECK_1` and `ANKI_REVIEW_DECK_2`; names must use letters, numbers, spaces, periods, or hyphens. The local Vite dev and preview servers expose only a fixed same-origin count route and query only those configured decks. Hosted builds do not have this local server route or access to your Anki Desktop.
+
 ## Your data
 
 - IndexedDB database: `daymark-dashboard`, schema version 1, store `state`.
