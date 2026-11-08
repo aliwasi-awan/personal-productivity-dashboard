@@ -54,10 +54,48 @@ export default function Calendar({ tasks, events, onTaskClick, onRangeChange }: 
           const dayKey=key(day), dayEvents=orderedEvents.filter(e=>eventOnDay(e,day));
           const dueTasks=tasks.filter(t=>t.due.slice(0,10)===dayKey);
           const isToday=dayKey===key(new Date());
-          return <div key={dayKey} className={`calendar-cell ${isToday?'is-today':''}`} style={{padding:10,minHeight:view==='month'?128:320,background:'var(--surface, #fff)',opacity:view==='month'&&day.getMonth()!==date.getMonth() ? 0.58 : 1,boxShadow:selected===dayKey?'inset 0 0 0 2px var(--accent, #8b75d7)':undefined}}>
-            <button type="button" className="calendar-date" aria-current={isToday?'date':undefined} aria-label={day.toLocaleDateString([], {weekday:'long',year:'numeric',month:'long',day:'numeric'})} onClick={()=>{setSelected(dayKey);setDate(day);if(view==='month')setView('day');}} style={{border:0,background:isToday?'var(--accent, #8b75d7)':'transparent',color:isToday?'white':'inherit',borderRadius:8,padding:'3px 7px',fontWeight:700,marginBottom:8}}>{view==='month'?day.getDate():day.toLocaleDateString([], {weekday:'short',day:'numeric'})}</button>
-            <div style={{display:'flex',flexDirection:'column',gap:5}}>
-              {dayEvents.map(e=>{const href=safeGoogleLink(e.url);const content=<><span style={{fontSize:12,opacity:.8}}>{e.allDay?'ALL DAY':`${key(new Date(e.start))!==dayKey?'↳ ':''}${time(e.start)}`}</span><span style={{display:'block'}}>{e.title}</span>{href&&<ExternalLink size={10} aria-hidden="true"/>}</>;const style={display:'block',padding:'5px 7px',fontSize:12,borderRadius:6,background:e.allDay?'var(--calendar-all-day, #e9e3f8)':'var(--calendar-timed, #e1edf5)',color:'#273040',textDecoration:'none',borderLeft:e.allDay?undefined:'3px solid #6ba9d5',overflowWrap:'anywhere' as const};return href?<a key={`${e.calendarId}:${e.id}`} href={href} target="_blank" rel="noopener noreferrer" style={style} aria-label={`${e.title}, ${e.allDay?'all day':`${time(e.start)} to ${time(e.end)}`}, opens Google Calendar in a new tab`}>{content}</a>:<div key={`${e.calendarId}:${e.id}`} style={style}>{content}</div>;})}
+          const isOutsideMonth = view === 'month' && day.getMonth() !== date.getMonth();
+          return <div
+            key={dayKey}
+            className={`calendar-cell${isToday ? ' is-today' : ''}${isOutsideMonth ? ' outside-month' : ''}`}
+            style={{
+              padding: 10,
+              minHeight: view === 'month' ? 128 : 320,
+              background: 'var(--surface)',
+              boxShadow: selected === dayKey ? 'inset 0 0 0 2px var(--accent)' : undefined,
+            }}
+          >
+            <button
+              type="button"
+              className="calendar-date"
+              aria-current={isToday ? 'date' : undefined}
+              aria-label={day.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              onClick={() => { setSelected(dayKey); setDate(day); if (view === 'month') setView('day'); }}
+            >
+              {view === 'month' ? day.getDate() : day.toLocaleDateString([], { weekday: 'short', day: 'numeric' })}
+            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {dayEvents.map(event => {
+                const href = safeGoogleLink(event.url);
+                const className = event.allDay ? 'calendar-event all-day' : 'calendar-event';
+                const eventKey = `${event.calendarId}:${event.id}`;
+                const timeLabel = event.allDay ? 'ALL DAY' : `${key(new Date(event.start)) !== dayKey ? '↳ ' : ''}${time(event.start)}`;
+                const content = <>
+                  <span className="calendar-event-meta">{timeLabel}</span>
+                  <span className="calendar-event-title">{event.title}</span>
+                  {href && <ExternalLink size={10} aria-hidden="true" />}
+                </>;
+                return href
+                  ? <a
+                      key={eventKey}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={className}
+                      aria-label={`${event.title}, ${event.allDay ? 'all day' : `${time(event.start)} to ${time(event.end)}`}, opens Google Calendar in a new tab`}
+                    >{content}</a>
+                  : <div key={eventKey} className={className}>{content}</div>;
+              })}
               {dueTasks.map(t=><button type="button" key={t.id} onClick={()=>onTaskClick(t)} className={`calendar-task ${t.status==='done'?'completed':''}`} title={t.title} style={{'--task-domain':DOMAINS.find(d=>d.id===t.domain)?.color||'#aaa'} as React.CSSProperties}><span className="calendar-task-meta">{t.status==='done'?'DONE':'DUE'} · {DOMAINS.find(d=>d.id===t.domain)?.name}</span><span className="calendar-task-title">{t.title}</span></button>)}
               {view==='day'&&!dayEvents.length&&!dueTasks.length&&<p className="muted">No events or task due dates for this day.</p>}
             </div>
