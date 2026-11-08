@@ -1,4 +1,4 @@
-# Daymark — Personal Productivity Dashboard
+# Fen1x's Lair — Personal Productivity Dashboard
 
 A local-first React + TypeScript dashboard for Personal, Work, German, and Study. Tasks, projects, goals, dedicated trackers, and activity logs share one IndexedDB store. Google Calendar is a read-only integration; dashboard tasks never create Google events.
 
